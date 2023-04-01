@@ -40,11 +40,12 @@ export const onSubscriptionChange = functions
             admins: [uid],
             users: [uid],
           });
+        const userRef = admin.firestore().collection("users").doc(uid);
+        const isSubscribed = subscriptionActive && subscription.quantity < 0;
+        userRef.update({ subscribed: isSubscribed });
       } else {
         const team = teamSnapshot.docs[0];
         const teamData = team.data();
-        console.log("users:", teamData.users);
-        console.log("qty:", subscription.quantity);
         const users = Array.isArray(teamData.users) ? teamData.users : [];
 
         const batch = admin.firestore().batch();
@@ -55,7 +56,7 @@ export const onSubscriptionChange = functions
           const userRef = admin.firestore().collection("users").doc(user);
           const isSubscribed =
             subscriptionActive && count <= subscription.quantity;
-          batch.update(userRef, {subscribed: isSubscribed});
+          batch.update(userRef, { subscribed: isSubscribed });
         }
 
         await batch.commit();
@@ -82,7 +83,7 @@ exports.onTeamUsersChange = functions
     if (!newData) {
       for (const uid of previousData.users) {
         const userRef = usersRef.doc(uid);
-        batch.update(userRef, {subscribed: false});
+        batch.update(userRef, { subscribed: false });
       }
       await batch.commit();
       console.log("All team's users subscriptions deactivated");
@@ -103,7 +104,7 @@ exports.onTeamUsersChange = functions
 
     for (const uid of removedUsers) {
       const userRef = usersRef.doc(uid);
-      batch.update(userRef, {subscribed: false});
+      batch.update(userRef, { subscribed: false });
     }
 
     const ownerId = newData.ownerId;
@@ -124,7 +125,7 @@ exports.onTeamUsersChange = functions
         const userRef = usersRef.doc(uid);
         const isSubscribed =
           subscriptionActive && count <= subscription.quantity;
-        batch.update(userRef, {subscribed: isSubscribed});
+        batch.update(userRef, { subscribed: isSubscribed });
       }
 
       await batch.commit();
