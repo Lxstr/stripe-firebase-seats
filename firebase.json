@@ -1,0 +1,25 @@
+{
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run lint",
+        "npm --prefix \"$RESOURCE_DIR\" run build"
+      ],
+      "runtime": "nodejs18",
+      "vpcConnectorEgressSettings": "private-ranges-only",
+      "region": "us-central1",
+      "timeoutSeconds": 60,
+      "minInstances": 1,
+      "maxInstances": 5,
+      "memory": "256MB"
+    }
+  ]
+}
