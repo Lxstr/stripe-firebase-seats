@@ -69,10 +69,23 @@ exports.onTeamUsersChange = functions
   .firestore.document("teams/{teamId}")
   .onWrite(async (change, context) => {
     const previousData = change.before.data() ?? null;
-    const newData = change.after.data() ?? null;
+    if (!previousData) {
+      console.log(
+        "Team is being created by stripe and other function will handle it"
+      );
+      return null;
+    }
 
-    if (!previousData || !newData) {
-      console.log("No team data found or team created/deleted");
+    const usersRef = admin.firestore().collection("users");
+    const batch = admin.firestore().batch();
+    const newData = change.after.data() ?? null;
+    if (!newData) {
+      for (const uid of previousData.users) {
+        const userRef = usersRef.doc(uid);
+        batch.update(userRef, {subscribed: false});
+      }
+      await batch.commit();
+      console.log("All team's users subscriptions deactivated");
       return null;
     }
 
@@ -88,36 +101,37 @@ exports.onTeamUsersChange = functions
       return null;
     }
 
-    const ownerId = newData.ownerId;
-    const usersRef = admin.firestore().collection("users");
-    const ownerDoc = await usersRef.doc(ownerId).get();
-    const ownerData = ownerDoc.data();
-    console.log("owner:", newData.ownerId);
-    console.log("owner:", ownerData);
+    for (const uid of removedUsers) {
+      const userRef = usersRef.doc(uid);
+      batch.update(userRef, {subscribed: false});
+    }
 
-    if (!ownerData || !ownerData.subscription) {
+    const ownerId = newData.ownerId;
+    const subscriptions = await usersRef
+      .doc(ownerId)
+      .collection("subscriptions")
+      .where("status", "==", "active")
+      .limit(1)
+      .get();
+
+    if (!subscriptions.empty) {
+      const subscription = subscriptions.docs[0].data();
+      const subscriptionActive =
+        subscription.status === "active" || subscription.status === "trialing";
+      let count = 0;
+      for (const uid of newData.users) {
+        count++;
+        const userRef = usersRef.doc(uid);
+        const isSubscribed =
+          subscriptionActive && count <= subscription.quantity;
+        batch.update(userRef, {subscribed: isSubscribed});
+      }
+
+      await batch.commit();
+      console.log("User subscribed state updated");
+      return null;
+    } else {
       console.log("No subscription data found for the team owner");
       return null;
     }
-
-    const subscription = ownerData.subscription;
-    console.log("owner:", subscription);
-    console.log("qty:", subscription.quantity);
-    const subscriptionActive =
-      subscription.status === "active" || subscription.status === "trialing";
-
-    // Update subscribed state for all users in the team
-    const batch = admin.firestore().batch();
-    let count = 0;
-
-    for (const uid of newData.users) {
-      count++;
-      const userRef = usersRef.doc(uid);
-      const isSubscribed = subscriptionActive && count <= subscription.quantity;
-      batch.update(userRef, {subscribed: isSubscribed});
-    }
-
-    await batch.commit();
-    console.log("User subscribed state updated");
-    return null;
   });
