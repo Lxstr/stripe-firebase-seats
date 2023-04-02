@@ -41,7 +41,7 @@ export const onSubscriptionChange = functions
             users: [uid],
           });
         const userRef = admin.firestore().collection("users").doc(uid);
-        const isSubscribed = subscriptionActive && subscription.quantity < 0;
+        const isSubscribed = subscriptionActive && subscription.quantity > 0;
         userRef.update({ subscribed: isSubscribed });
       } else {
         const team = teamSnapshot.docs[0];
