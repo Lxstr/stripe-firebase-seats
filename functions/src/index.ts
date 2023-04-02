@@ -31,7 +31,7 @@ export const onSubscriptionChange = functions
       );
 
       if (teamSnapshot.empty) {
-        const teamId = await admin
+        const teamDocRef = await admin
           .firestore()
           .collection("teams")
           .add({
@@ -40,6 +40,8 @@ export const onSubscriptionChange = functions
             admins: [uid],
             users: [uid],
           });
+
+        const teamId = teamDocRef.id;
         const userRef = admin.firestore().collection("users").doc(uid);
         const isSubscribed = subscriptionActive && subscription.quantity > 0;
         userRef.update({ subscribed: isSubscribed, associatedTeam: teamId });
