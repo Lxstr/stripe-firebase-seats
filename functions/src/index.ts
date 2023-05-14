@@ -37,6 +37,7 @@ export const onSubscriptionChange = functions
           .add({
             name: teamName,
             ownerId: uid,
+            quantity: subscription.quantity,
             admins: [uid],
             users: [uid],
           });
@@ -44,12 +45,12 @@ export const onSubscriptionChange = functions
         const teamId = teamDocRef.id;
         const userRef = admin.firestore().collection("users").doc(uid);
         const isSubscribed = subscriptionActive && subscription.quantity > 0;
-        userRef.update({ subscribed: isSubscribed, associatedTeam: teamId });
+        userRef.update({subscribed: isSubscribed, associatedTeam: teamId});
       } else {
         const team = teamSnapshot.docs[0];
         const teamData = team.data();
         const users = Array.isArray(teamData.users) ? teamData.users : [];
-
+        team.ref.update({quantity: subscription.quantity});
         const batch = admin.firestore().batch();
         let count = 0;
 
@@ -58,7 +59,7 @@ export const onSubscriptionChange = functions
           const userRef = admin.firestore().collection("users").doc(user);
           const isSubscribed =
             subscriptionActive && count <= subscription.quantity;
-          batch.update(userRef, { subscribed: isSubscribed });
+          batch.update(userRef, {subscribed: isSubscribed});
         }
 
         await batch.commit();
@@ -85,7 +86,7 @@ exports.onTeamUsersChange = functions
     if (!newData) {
       for (const uid of previousData.users) {
         const userRef = usersRef.doc(uid);
-        batch.update(userRef, { subscribed: false });
+        batch.update(userRef, {subscribed: false});
       }
       await batch.commit();
       console.log("All team's users subscriptions deactivated");
@@ -106,7 +107,7 @@ exports.onTeamUsersChange = functions
 
     for (const uid of removedUsers) {
       const userRef = usersRef.doc(uid);
-      batch.update(userRef, { subscribed: false });
+      batch.update(userRef, {subscribed: false});
     }
 
     const ownerId = newData.ownerId;
@@ -127,7 +128,7 @@ exports.onTeamUsersChange = functions
         const userRef = usersRef.doc(uid);
         const isSubscribed =
           subscriptionActive && count <= subscription.quantity;
-        batch.update(userRef, { subscribed: isSubscribed });
+        batch.update(userRef, {subscribed: isSubscribed});
       }
 
       await batch.commit();
