@@ -55,10 +55,12 @@ export const onSubscriptionChange = functions
 
         let count = 0;
         for (const member of members) {
+          console.log(member);
           const isUser = member.is_user ?? false;
 
           const isSubscribed =
             subscriptionActive && isUser && count <= subscription.quantity;
+          console.log(isSubscribed);
           if (isSubscribed) {
             count++;
           }
@@ -68,6 +70,9 @@ export const onSubscriptionChange = functions
             .doc(team.id)
             .collection("members")
             .doc(member.uid);
+          console.log(memberRef);
+          console.log(userRef);
+
           batch.update(userRef, { is_subscribed: isSubscribed });
           batch.update(memberRef, { is_subscribed: isSubscribed });
         }
