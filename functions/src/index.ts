@@ -29,37 +29,47 @@ export const onSubscriptionChange = functions
       const subscriptionActive: boolean = ["trialing", "active"].includes(
         subscription.status
       );
+      const userRef = admin.firestore().collection("users").doc(uid);
 
       if (teamSnapshot.empty) {
-        const teamDocRef = await admin
-          .firestore()
-          .collection("teams")
-          .add({
-            name: teamName,
-            ownerId: uid,
-            quantity: subscription.quantity,
-            admins: [uid],
-            users: [uid],
-          });
+        const teamDocRef = await admin.firestore().collection("teams").add({
+          name: teamName,
+          ownerId: uid,
+          quantity: subscription.quantity,
+        });
+
+        teamDocRef.collection("members").doc(uid).set({
+          uid: uid,
+          is_subscribed: true,
+        });
 
         const teamId = teamDocRef.id;
-        const userRef = admin.firestore().collection("users").doc(uid);
         const isSubscribed = subscriptionActive && subscription.quantity > 0;
-        userRef.update({subscribed: isSubscribed, associatedTeam: teamId});
+        userRef.update({ subscribed: isSubscribed, associatedTeam: teamId });
       } else {
         const team = teamSnapshot.docs[0];
         const teamData = team.data();
-        const users = Array.isArray(teamData.users) ? teamData.users : [];
-        team.ref.update({quantity: subscription.quantity});
+        const members = Array.isArray(teamData.members) ? teamData.members : [];
+        team.ref.update({ quantity: subscription.quantity });
         const batch = admin.firestore().batch();
-        let count = 0;
 
-        for (const user of users) {
-          count++;
-          const userRef = admin.firestore().collection("users").doc(user);
+        let count = 0;
+        for (const member of members) {
+          const isUser = member.is_user ?? false;
+
           const isSubscribed =
-            subscriptionActive && count <= subscription.quantity;
-          batch.update(userRef, {subscribed: isSubscribed});
+            subscriptionActive && isUser && count <= subscription.quantity;
+          if (isSubscribed) {
+            count++;
+          }
+          const memberRef = admin
+            .firestore()
+            .collection("teams")
+            .doc(team.id)
+            .collection("members")
+            .doc(member.uid);
+          batch.update(userRef, { is_subscribed: isSubscribed });
+          batch.update(memberRef, { is_subscribed: isSubscribed });
         }
 
         await batch.commit();
@@ -84,30 +94,22 @@ exports.onTeamUsersChange = functions
     const batch = admin.firestore().batch();
     const newData = change.after.data() ?? null;
     if (!newData) {
-      for (const uid of previousData.users) {
+      for (const uid of previousData.members) {
         const userRef = usersRef.doc(uid);
-        batch.update(userRef, {subscribed: false});
+        batch.update(userRef, { subscribed: false });
       }
       await batch.commit();
       console.log("All team's users subscriptions deactivated");
       return null;
     }
 
-    const addedUsers = newData.users.filter(
-      (uid: string) => !previousData.users.includes(uid)
+    const removedUsers = previousData.members.filter(
+      (uid: string) => !newData.members.includes(uid)
     );
-    const removedUsers = previousData.users.filter(
-      (uid: string) => !newData.users.includes(uid)
-    );
-
-    if (addedUsers.length === 0 && removedUsers.length === 0) {
-      console.log("No user changes detected");
-      return null;
-    }
 
     for (const uid of removedUsers) {
       const userRef = usersRef.doc(uid);
-      batch.update(userRef, {subscribed: false});
+      batch.update(userRef, { subscribed: false });
     }
 
     const ownerId = newData.ownerId;
@@ -122,13 +124,21 @@ exports.onTeamUsersChange = functions
       const subscription = subscriptions.docs[0].data();
       const subscriptionActive =
         subscription.status === "active" || subscription.status === "trialing";
+
       let count = 0;
-      for (const uid of newData.users) {
-        count++;
-        const userRef = usersRef.doc(uid);
+      for (const uid of newData.members) {
+        const isUser =
+          newData.members.find((member: any) => member.uid === uid)?.is_user ??
+          false;
+
         const isSubscribed =
-          subscriptionActive && count <= subscription.quantity;
-        batch.update(userRef, {subscribed: isSubscribed});
+          subscriptionActive && isUser && count <= subscription.quantity;
+        if (isSubscribed) {
+          count++;
+        }
+
+        const userRef = usersRef.doc(uid);
+        batch.update(userRef, { subscribed: isSubscribed });
       }
 
       await batch.commit();
