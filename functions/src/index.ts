@@ -20,8 +20,10 @@ const updateIsSubscribed = async (
   let count = 1;
 
   const batch = admin.firestore().batch();
-  membersSnapshot.forEach((memberDoc) => {
+  membersSnapshot.forEach(async (memberDoc) => {
     const memberData = memberDoc.data();
+    const uid = memberData.id;
+    const userDoc = await admin.firestore().collection("users").doc(uid).get();
     console.log(memberData);
     const isUser = memberData.is_user;
     const isSubscribed = subscriptionActive && isUser && count <= quantity;
@@ -30,6 +32,10 @@ const updateIsSubscribed = async (
     if (isSubscribed) count++;
     if (memberData.is_subscribed !== isSubscribed) {
       batch.update(memberDoc.ref, { is_subscribed: isSubscribed });
+      batch.update(userDoc.ref, {
+        is_subscribed: isSubscribed,
+        // associatedTeam: teamId,
+      });
     }
   });
 
@@ -49,10 +55,47 @@ export const onSubscriptionChange = functions
     const subscription = change.after.exists ? change.after.data() : null;
     const subscriptionActive = subscription?.status === "active";
     const quantity = subscription?.quantity ?? 0;
+
+    // IF there is a team associated with user who owns subscription, update members status within the team
+    // ELSE IF subscription is > 1, create team and give user access with is_subscribed
+    // ELSE IF subscription is 1,
     if (!teamSnapshot.empty) {
       const teamDoc = teamSnapshot.docs[0];
       const teamId = teamDoc.id;
       await updateIsSubscribed(teamId, subscriptionActive, quantity);
+    } else if (quantity > 1) {
+      const teamDocRef = await admin.firestore().collection("teams").add({
+        ownerId: userId,
+        admins: [],
+        members: [],
+      });
+      const teamId = teamDocRef.id;
+      const userDoc = await admin
+        .firestore()
+        .collection("users")
+        .doc(userId)
+        .get();
+      const userData = userDoc.data();
+      if (userData) {
+        await admin
+          .firestore()
+          .collection("teams")
+          .doc(teamId)
+          .collection("members")
+          .add({
+            email: userData.email,
+            is_admin: true,
+            is_user: true,
+          });
+        await updateIsSubscribed(teamId, subscriptionActive, quantity);
+      }
+      userDoc.ref.update({ subscribed: true, associatedTeam: teamId });
+    } else if (quantity == 1) {
+      await admin
+        .firestore()
+        .collection("users")
+        .doc(userId)
+        .set({ is_subscribed: subscriptionActive });
     }
   });
 
