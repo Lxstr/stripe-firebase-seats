@@ -5,10 +5,14 @@ The function is triggered by any new or changed subscription and creates or upda
 ```
 teams (collection)
 ├─ {teamId} (document)
-│  ├─ ownerId: string (id)
+│  ├─ ownerId: string (userId)
 │  ├─ name: string
-│  ├─ admins: Array<string> (ids)
-│  └─ users: Array<string> (ids)
+│  ├─ admins: Array<string> (userIds)
+│  └─ members (subcollection)
+│      └─ {memberId} (document)
+│         ├─ is_user: bool
+│         └─ is_subscribed: bool
+│
 ```
 
 ```
@@ -16,8 +20,7 @@ users (collection)
 ├─ {userId} (document)
 │  ├─ uid: string
 │  ├─ associatedTeam: string
-│  ├─ subscribed: bool
-│  └─ subscriptions (subcollection)
+│  └─ subscriptions (subcollection) (managed by stripe extension)
 │      └─ {subscriptionId} (document)
 │         ├─ status: string
 │         └─ quantity: number
