@@ -33,7 +33,7 @@ const updateIsSubscribed = async (
     if (isSubscribed) count++;
 
     // Update member's subscription status
-    batch.update(memberDoc.ref, { is_subscribed: isSubscribed });
+    batch.update(memberDoc.ref, {is_subscribed: isSubscribed});
 
     // Retrieve the user document for additional updates
     const userDoc = await admin.firestore().collection("users").doc(uid).get();
@@ -75,43 +75,12 @@ export const onSubscriptionChange = functions
       const teamDoc = teamSnapshot.docs[0];
       const teamId = teamDoc.id;
       await updateIsSubscribed(teamId, subscriptionActive, quantity);
-    }
-    // If not, create a team and give user access
-    // else if (quantity > 1) {
-    //   const teamDocRef = await admin.firestore().collection("teams").add({
-    //     ownerId: userId,
-    //     admins: [],
-    //     members: [],
-    //   });
-    //   const teamId = teamDocRef.id;
-    //   const userDoc = await admin
-    //     .firestore()
-    //     .collection("users")
-    //     .doc(userId)
-    //     .get();
-    //   const userData = userDoc.data();
-
-    //   if (userData) {
-    //     await admin
-    //       .firestore()
-    //       .collection("teams")
-    //       .doc(teamId)
-    //       .collection("members")
-    //       .add({
-    //         email: userData.email,
-    //         is_admin: true,
-    //         is_user: true,
-    //       });
-    //   }
-    //   userDoc.ref.update({ subscribed: true, associatedTeam: teamId });
-    // } 
-    // If the subscription quantity is 1, update the user's subscription status
-    else if (quantity === 1) {
+    } else if (quantity === 1) {
       await admin
         .firestore()
         .collection("users")
         .doc(userId)
-        .set({ is_subscribed: subscriptionActive });
+        .set({is_subscribed: subscriptionActive});
     }
   });
 
@@ -147,7 +116,7 @@ export const onMemberChange = functions
         .limit(1)
         .get();
 
-      // If the owner has an active subscription, update team members' subscription status
+      // If the owner has an active subscription, update team members' subs
       if (!subscriptionsSnapshot.empty) {
         const subscription = subscriptionsSnapshot.docs[0].data();
         const subscriptionActive = subscription.status === "active";
